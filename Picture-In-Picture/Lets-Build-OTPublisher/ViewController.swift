@@ -35,6 +35,8 @@ class ViewController: UIViewController {
     var pipController: AVPictureInPictureController! = nil
     
     var pipObservation: NSKeyValueObservation?
+    
+    let sampleBufferVideoCallView = SampleBufferVideoCallView()
         
     @IBOutlet weak var videoContainerView: UIView!
     
@@ -72,7 +74,7 @@ class ViewController: UIViewController {
         publisher = OTPublisher(delegate: self, settings: settings)
         
         session.publish(publisher!, error: &error)
-         
+        
          if let pubView = publisher!.view {
              pubView.frame = CGRect(x: 0, y: 0, width: view.frame.width, height: view.frame.width / kWidgetRatio)
              view.addSubview(pubView)
@@ -92,12 +94,14 @@ class ViewController: UIViewController {
         }
         subscriber = OTSubscriber(stream: stream, delegate: self)
         
-        let videoRender = ExampleVideoRender()
+        let frame = CGRect(x: 0, y: view.frame.width / kWidgetRatio, width: view.frame.width, height: view.frame.width / kWidgetRatio)
+        
+        let videoRender = ExampleVideoRender(frame:frame, sampleBufferVideoCallView: sampleBufferVideoCallView)
         subscriber?.videoRender = videoRender
         
         session.subscribe(subscriber!, error: &error)
         
-        pipSetup(videoRender: videoRender)
+        pipSetup(videoRender: videoRender, frame: frame)
         
     }
     
@@ -120,24 +124,41 @@ class ViewController: UIViewController {
         }
     }
     
-    fileprivate func pipSetup(videoRender: ExampleVideoRender) {
-        let notificationCenter = NotificationCenter.default
-        notificationCenter.addObserver(self, selector: #selector(appMovedToBackground), name: UIApplication.willResignActiveNotification, object: nil)
-        
-        let frame = CGRect(x: 0, y: view.frame.width / kWidgetRatio, width: view.frame.width, height: view.frame.width / kWidgetRatio)
+    fileprivate func pipSetup(videoRender: ExampleVideoRender, frame: CGRect) {
 
         let bufferDisplayLayer = videoRender.bufferDisplayLayer
-        bufferDisplayLayer.frame = frame
 
-        bufferDisplayLayer.videoGravity = .resizeAspect
-        videoContainerView.layer.addSublayer(bufferDisplayLayer)
+//        bufferDisplayLayer!.videoGravity = .resizeAspect
+//        videoContainerView.frame = frame
+//        videoContainerView.layer.addSublayer(bufferDisplayLayer!)
         
-        let contentSource = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: videoRender.bufferDisplayLayer, playbackDelegate: self)
         
+//        let contentSource = AVPictureInPictureController.ContentSource(sampleBufferDisplayLayer: videoRender.bufferDisplayLayer, playbackDelegate: self)
+
+        let pipVideoCallViewController = AVPictureInPictureVideoCallViewController()
+        pipVideoCallViewController.preferredContentSize = CGSize(width: 300, height: 300)
+        pipVideoCallViewController.view.addSubview(sampleBufferVideoCallView)
+        
+        sampleBufferVideoCallView.translatesAutoresizingMaskIntoConstraints = false
+      let constraints = [
+          sampleBufferVideoCallView.leadingAnchor.constraint(equalTo: pipVideoCallViewController.view.leadingAnchor),
+          sampleBufferVideoCallView.trailingAnchor.constraint(equalTo: pipVideoCallViewController.view.trailingAnchor),
+          sampleBufferVideoCallView.topAnchor.constraint(equalTo: pipVideoCallViewController.view.topAnchor),
+          sampleBufferVideoCallView.bottomAnchor.constraint(equalTo: pipVideoCallViewController.view.bottomAnchor)
+      ]
+      NSLayoutConstraint.activate(constraints)
+      
+      sampleBufferVideoCallView.bounds = pipVideoCallViewController.view.frame
+        
+        let contentSource = AVPictureInPictureController.ContentSource(
+            activeVideoCallSourceView: videoContainerView,
+                                    contentViewController: pipVideoCallViewController)
         
         
         pipController = AVPictureInPictureController(contentSource: contentSource)
         pipController.delegate = self
+        
+        pipController.canStartPictureInPictureAutomaticallyFromInline = true
         
         pipObservation = pipController.observe(\AVPictureInPictureController.isPictureInPicturePossible,
                                                 options: [.initial, .new]) { [weak self] _, change in
@@ -151,16 +172,7 @@ class ViewController: UIViewController {
     @IBAction func startPIP(_ sender: Any) {
         pipController.startPictureInPicture()
     }
-    
-    @IBAction func nextViewTapped(_ sender: Any) {
-    }
-    
-    @objc func appMovedToBackground() {
-        print("app move to background", pipController.isPictureInPicturePossible)
-        if pipController.isPictureInPicturePossible {
-            pipController.startPictureInPicture()
-        }
-    }
+
 }
 
 // MARK: - OTSession delegate callbacks
@@ -216,9 +228,6 @@ extension ViewController: OTPublisherDelegate {
 extension ViewController: OTSubscriberDelegate {
     func subscriberDidConnect(toStream subscriberKit: OTSubscriberKit) {
 //        subscriber?.view?.frame = CGRect(x: 0, y: view.frame.width / kWidgetRatio, width: view.frame.width, height: view.frame.width / kWidgetRatio)
-        
-
-        
 //        if let subsView = subscriber?.view {
 //            view.addSubview(subsView)
 //        }

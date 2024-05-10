@@ -120,11 +120,12 @@ class ExampleVideoRender: UIView {
     var delegate: ExampleVideoRenderDelegate?
     
     var frameLock = NSLock()
-    var bufferDisplayLayer: AVSampleBufferDisplayLayer = AVSampleBufferDisplayLayer()
+    var bufferDisplayLayer: AVSampleBufferDisplayLayer!
     let accel = Accelerater()
     
-    override init(frame: CGRect) {
+    init(frame: CGRect, sampleBufferVideoCallView: SampleBufferVideoCallView) {
         super.init(frame: frame)
+        bufferDisplayLayer = sampleBufferVideoCallView.sampleBufferDisplayLayer
     }
     
     required init?(coder aDecoder: NSCoder) {
@@ -152,6 +153,7 @@ extension ExampleVideoRender: OTVideoRender {
             if let sampleBuffer = createSampleBufferWithVideoFrame(frame,
                                                                    width: Int(frame.format!.imageWidth),
                                                                    height: Int(frame.format!.imageHeight)) {
+
                 bufferDisplayLayer.enqueue(sampleBuffer)
             }
             
